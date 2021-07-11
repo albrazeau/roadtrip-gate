@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  postgres:
+    image: kartoza/postgis:13.0
+    networks:
+      - roadtrip-net
+    ports:
+      - 5432:5432
+    volumes:
+      - roadtrip-db:/var/lib/postgresql
+    environment:
+      - ALLOW_IP_RANGE=0.0.0.0/0
+    restart: on-failure
+
+  roadtrip:
+      build: ./app
+      volumes:
+          - ./app:/app
+      ports:
+          - 80:80
+      networks:
+          - roadtrip-net
+      environment:
+          - FLASK_APP=main.py
+          - FLASK_DEBUG=1
+          # - 'RUN=flask run --host=0.0.0.0 --port=80'
+      env_file: 
+          - ./.env
+      command: flask run --host=0.0.0.0 --port=80
+
+volumes:
+    roadtrip-db:
+    
+networks:
+    roadtrip-net:
+        driver: bridge
