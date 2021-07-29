@@ -80,6 +80,27 @@ def insert_pg(sql):
                 curs.execute(sql)
         conn.commit()
 
+def image_resize(img):
+
+    image = Image.open(img)
+    width, height = image.size
+
+    if width > height:
+
+        w = 300
+        h = int(w*1.333)
+        image = image.resize((w,h), Image.ANTIALIAS)
+
+        return image, "Wide"
+
+    if height > width:
+
+        h = 300
+        w = int(h*1.333)
+        image = image.resize((w,h), Image.ANTIALIAS)
+
+        return image, "Tall"
+
 
 if __name__ == "__main__":
 
@@ -91,6 +112,8 @@ if __name__ == "__main__":
     images = list(set(glob(os.path.join(raw_img_dir, "*.JPG")) + glob(os.path.join(raw_img_dir, "*.jpg"))))
 
     for img in images:
+
+        img, orientation = image_resize(img)
 
         exif = get_exif(img)
         metadata = get_labeled_exif(exif)
@@ -120,8 +143,10 @@ if __name__ == "__main__":
                 '{guid}',
                 '{clean_filename}',
                 TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
-                ST_SetSRID(ST_Point({lon}, {lat}), 4326)
+                ST_SetSRID(ST_Point({lon}, {lat}), 4326),
+                '{orientation}'
             );
             """
+
 
             insert_pg(insert_sql)
