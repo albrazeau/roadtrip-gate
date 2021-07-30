@@ -7,6 +7,7 @@
         integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://unpkg.com/blocks.css/dist/blocks.min.css" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Rancho&effect=shadow-multiple" />
     <title>Along the Way</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
@@ -15,9 +16,21 @@
 
 
     <div class="pagewidth">
-        <div>
-            <h1>Along the Way<img src={{ url_for('static', filename='./jeep.png' ) }} width="20%" alt="Jeep" border="0">
+
+        <div class='titleblock'>
+            <img src={{ url_for('static', filename='./jeep.png' ) }} alt="Jeep">
+            <h1>
+                Beep This Jeep
             </h1>
+        </div>
+
+        <div>
+            <h4>
+                Here's is some placeholder text! Here's is some placeholder text! Here's is some placeholder text!
+                Here's is some placeholder text!
+                <br /><br />
+                I've seen the future and it's getting better all the time!
+            </h4>
         </div>
 
         <div class="editor fixed block" style="width:100%">{{ create_map() }}</div>

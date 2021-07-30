@@ -3,6 +3,7 @@ from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import folium
 from folium import IFrame
+import folium.plugins as plugins
 import base64
 import glob
 import os
@@ -42,8 +43,17 @@ def my_utility_processor():
             df = pd.read_sql(fetch_sql, conn)
 
         folium_map = folium.Map(location=US_CENTER, 
-        zoom_start=4, scrollWheelZoom=False,  
-        tiles="Stamen Terrain")
+        zoom_start=4, scrollWheelZoom=False)
+
+        draw_line = list(df.sort_values(by='date_taken')[['lat_y', 'lon_x']].apply(tuple, axis=1))
+        folium.PolyLine(draw_line, color="#c20dff", weight=2.5, opacity=1).add_to(folium_map)
+
+
+        folium_map.add_child(plugins.Geocoder())
+        folium.TileLayer('openstreetmap').add_to(folium_map)
+        folium.TileLayer('Stamen Terrain').add_to(folium_map)
+        folium.LayerControl().add_to(folium_map)
+        folium_map.add_child(plugins.Fullscreen(position='topleft', title='Full Screen', title_cancel='Exit Full Screen', force_separate_button=False))
 
         for idx in range(len(df)):
 
@@ -69,9 +79,6 @@ def my_utility_processor():
             folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
 
         return Markup(folium_map._repr_html_())
-
-        def jeep_image():
-            
 
     return dict(create_map=create_map)
 
