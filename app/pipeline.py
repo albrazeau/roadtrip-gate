@@ -6,11 +6,17 @@ from glob import glob
 import psycopg2
 from contextlib import closing
 from time import sleep
+from headers import DB_CONNECTION_LOCAL, DB_CONNECTION_DOCKER
 
-DB_CONNECTION = "host={} user={} password={} dbname={} port={}".format(
-    os.environ["DBHOST"], os.environ["DBUSER"], os.environ["DBPASS"], os.environ["DBNAME"], os.environ["DBPORT"]
-)
+# DB_CONNECTION = "host={} user={} password={} dbname={} port={}".format(
+#     os.environ["DBHOST"], os.environ["DBUSER"], os.environ["DBPASS"], os.environ["DBNAME"], os.environ["DBPORT"]
+# )
 
+# local
+DB_CONNECTION = DB_CONNECTION_LOCAL
+
+# docker
+# DB_CONNECTION = DB_CONNECTION_DOCKER
 
 def get_geotagging(exif):
     if not exif:
@@ -64,13 +70,13 @@ def get_coordinates(geotags):
     return (lat, lon)
 
 
-def clean_img(filename, output_path):
-    photo = Image.open(filename)
-    data = list(photo.getdata())
-    no_exif = Image.new(photo.mode, photo.size)
-    no_exif.putdata(data)
-    no_exif.save(output_path)
-    return
+# def clean_img(filename, output_path):
+#     photo = Image.open(filename)
+#     data = list(photo.getdata())
+#     no_exif = Image.new(photo.mode, photo.size)
+#     no_exif.putdata(data)
+#     no_exif.save(output_path)
+#     return
 
 
 def insert_pg(sql):
@@ -80,7 +86,7 @@ def insert_pg(sql):
                 curs.execute(sql)
         conn.commit()
 
-def image_resize(img):
+def clean_and_resize(img):
 
     image = Image.open(img)
     width, height = image.size
@@ -88,32 +94,44 @@ def image_resize(img):
     if width > height:
 
         w = 300
-        h = int(w*1.333)
+        h = int(w*.667)
         image = image.resize((w,h), Image.ANTIALIAS)
-
-        return image, "Wide"
+        orientation = "L"
 
     if height > width:
 
         h = 300
-        w = int(h*1.333)
+        w = int(h*.667)
         image = image.resize((w,h), Image.ANTIALIAS)
+        orientation = "P"
 
-        return image, "Tall"
+    data = list(image.getdata())
+
+    no_exif = Image.new(image.mode, image.size)
+    no_exif.putdata(data)
+
+    newpath = img.replace("raw","ready").replace(img.split("/")[-1], "clean_"+img.split("/")[-1])
+
+    no_exif.save(newpath)
+
+    return orientation, image
 
 
 if __name__ == "__main__":
 
     sleep(5)
 
-    raw_img_dir = "/data/raw"
-    clean_dir = "/data/ready"
+# docker
+    # raw_img_dir = "/data/raw"
+    # clean_dir = "/data/ready"
+
+# local
+    raw_img_dir = "/home/ubuntu/workbench/roadtrip-gate/data/raw"
+    clean_dir = "/home/ubuntu/workbench/roadtrip-gate/data/ready"
 
     images = list(set(glob(os.path.join(raw_img_dir, "*.JPG")) + glob(os.path.join(raw_img_dir, "*.jpg"))))
 
     for img in images:
-
-        img, orientation = image_resize(img)
 
         exif = get_exif(img)
         metadata = get_labeled_exif(exif)
@@ -136,7 +154,9 @@ if __name__ == "__main__":
 
         if not os.path.exists(output_img_path):
 
-            clean_img(img, output_img_path)
+            orientation, final_img = clean_and_resize(img)
+
+            # clean_img(img, output_img_path)
 
             insert_sql = f"""
             INSERT INTO roadtrip.images VALUES (
@@ -147,6 +167,5 @@ if __name__ == "__main__":
                 '{orientation}'
             );
             """
-
 
             insert_pg(insert_sql)

@@ -1,5 +1,4 @@
 from flask import Flask, render_template, request, jsonify, Markup
-from pipeline import get_geotagging, get_labeled_exif, get_exif, get_decimal_from_dms, get_coordinates, clean_img, insert_pg
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
 import folium
@@ -8,56 +7,71 @@ import base64
 import glob
 import os
 import psycopg2
+import pandas as pd
+from contextlib import closing
+from headers import DB_CONNECTION_LOCAL, DB_CONNECTION_DOCKER
 
-app = Flask(__name__)
+# local
+# DB_CONNECTION = DB_CONNECTION_LOCAL
+# clean_dir = "/home/ubuntu/workbench/roadtrip-gate/data/ready"
 
-raw_img_dir = "/data/raw"
+# docker
+DB_CONNECTION = DB_CONNECTION_DOCKER
 clean_dir = "/data/ready"
 
-# conn = psycopg2.connect(host={}, 
-#                         port={}, 
-#                         database={}, 
-#                         user="postgres", 
-#                         password="postgres").format(
-#     os.environ["DBHOST"], os.environ["DBUSER"], os.environ["DBPASS"], os.environ["DBNAME"], os.environ["DBPORT"]
-# )
+US_CENTER = ('39.009734', '-97.555620')
 
-DB_CONNECTION = "host={} user={} password={} dbname={} port={}".format(
-    os.environ["DBHOST"], os.environ["DBUSER"], os.environ["DBPASS"], os.environ["DBNAME"], os.environ["DBPORT"]
-)
-
-# images = list(set(glob(os.path.join(raw_img_dir, "*.JPG")) + glob(os.path.join(raw_img_dir, "*.jpg"))))
+app = Flask(__name__)
 
 @app.context_processor
 def my_utility_processor():
 
     def create_map():
         
-        img = '/data/raw/IMG_0693.JPG'
+        fetch_sql = f"""SELECT
+                            guid,
+                            file_name,
+                            date_taken,
+                            orientation,
+                            ST_X(geom) AS lon_x,
+                            ST_Y(geom) AS lat_y
+                        FROM
+                            roadtrip.images;"""
 
-        UScenter = ('37.809734', '-97.555620')
+        with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+            df = pd.read_sql(fetch_sql, conn)
 
-        exif = get_exif(img)
-        geotags = get_geotagging(exif)
-        lat, lon = get_coordinates(geotags)
+        folium_map = folium.Map(location=US_CENTER, 
+        zoom_start=4, scrollWheelZoom=False,  
+        tiles="Stamen Terrain")
 
-        image = Image.open(img)
-        image = image.resize((225,int(225*1.33)), Image.ANTIALIAS)
-        image.save('test.JPG', quality=100)
-        
-        encoded = base64.b64encode(open('test.JPG', 'rb').read())
-        html = '<img src="data:image/JPG;base64,{}">'.format
-        iframe = IFrame(html(encoded.decode("UTF-8")), width=225+20, height=300+20)
-        popup = folium.Popup(iframe, max_width=250)
-        tooltip = "Phelps Lake, Grand Teton National Park"
-        
-        folium_map = folium.Map(location=UScenter, 
-                    zoom_start=5, scrollWheelZoom=False,  
-                    tiles="Stamen Terrain")
+        for idx in range(len(df)):
 
-        folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
+            img_name = df.iloc[idx]['file_name']
+            fullpath = f"{clean_dir}/{img_name}"
+            lon = df.iloc[idx]['lon_x']
+            lat = df.iloc[idx]['lat_y']
+
+            # resize appropriately
+            image = Image.open(fullpath)
+            width, height = image.size
+            width = width + 25
+            height = height + 25
+
+            encoded = base64.b64encode(open(fullpath, 'rb').read())
+            html = '<img src="data:image/JPG;base64,{}">'.format
+            
+            iframe = IFrame(html(encoded.decode("UTF-8")), width=width, height=height)
+            
+            popup = folium.Popup(iframe, max_width=width+25)
+            tooltip = img_name.replace("_"," ")
+            
+            folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
 
         return Markup(folium_map._repr_html_())
+
+        def jeep_image():
+            
 
     return dict(create_map=create_map)
 

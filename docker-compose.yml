@@ -25,11 +25,12 @@ services:
       environment:
           - FLASK_APP=main.py
           - FLASK_DEBUG=1
-          # - 'RUN=flask run --host=0.0.0.0 --port=80'
       env_file: 
           - ./.env
       command: flask run --host=0.0.0.0 --port=80
       # command: python /app/pipeline.py
+      # below doesn't appear to work
+      # command: python /app/pipeline.py && flask run --host=0.0.0.0 --port=80 
 
 volumes:
     roadtrip-db:

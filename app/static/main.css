@@ -1,0 +1,18 @@
+html, body {
+    background-color: #f8f8f8;
+    max-width: 100%;
+    overflow-x: hidden;
+    justify-content: center;
+    margin: auto;
+    width: 1500px; 
+    font-family: system-ui, 'Helvetica Neue', 'Arial', sans-serif;
+  }
+
+  .pagewidth {  /* width of content box remains the same, even when zoomed in or out (note that the text still spreads out as the page grows) */
+    margin: auto;
+    width: 80%;
+    padding: 5px;
+    background-color: linear-gradient(#F0F);
+    text-align: center;
+    justify-content: center;
+  }

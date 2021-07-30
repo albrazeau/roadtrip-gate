@@ -2,20 +2,27 @@
 <html lang="en">
 
 <head>
-    <!-- <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='main.css') }}" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w==" crossorigin="anonymous" referrerpolicy="no-referrer" /> -->
-    <title>One More Step</title>
-    <!-- <script src="https://cdn.plot.ly/plotly-latest.min.js"></script> -->
+    <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='main.css') }}" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
+        integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://unpkg.com/blocks.css/dist/blocks.min.css" />
+    <title>Along the Way</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
 
 <body>
 
-    <div>
-        If I take one more step, Mr. Frodo, this'll be the furthest away from home I've ever been.
-    </div>
 
-    <div>{{ create_map() }}</div>
-    <br><br><br><br>
+    <div class="pagewidth">
+        <div>
+            <h1>Along the Way<img src={{ url_for('static', filename='./jeep.png' ) }} width="20%" alt="Jeep" border="0">
+            </h1>
+        </div>
+
+        <div class="editor fixed block" style="width:100%">{{ create_map() }}</div>
+        <br><br><br><br>
+    </div>
 
 </body>
 

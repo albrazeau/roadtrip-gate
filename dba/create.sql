@@ -5,5 +5,5 @@ CREATE TABLE IF NOT EXISTS roadtrip.images (
     file_name TEXT UNIQUE,
     date_taken timestamp,
     geom GEOMETRY(Point, 4326),
-    orientation VARCHAR(5)
+    orientation TEXT
 );
