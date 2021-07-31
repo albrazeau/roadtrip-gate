@@ -27,8 +27,8 @@ services:
           - FLASK_DEBUG=1
       env_file: 
           - ./.env
-      command: flask run --host=0.0.0.0 --port=80
-      # command: python /app/pipeline.py
+
+      command: /app/run_all.sh
       # below doesn't appear to work
       # command: python /app/pipeline.py && flask run --host=0.0.0.0 --port=80 
 
