@@ -172,4 +172,8 @@ if __name__ == "__main__":
                     insert_pg(insert_sql)
             
             except ValueError:
+
+                image = Image.open(img)
+                newpath = img.replace("raw","nogeodata")
+                image.save(newpath)
                 pass
