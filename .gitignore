@@ -130,5 +130,7 @@ dmypy.json
 
 data/
 .vscode/
+
 *.json
 *.pickle
+headers.py
