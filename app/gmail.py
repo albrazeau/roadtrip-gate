@@ -5,8 +5,9 @@ import pickle
 import os.path
 import base64
 import email
+from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
-  
+
 # Define the SCOPES. If modifying it, delete the token.pickle file.
 SCOPES = ['https://mail.google.com/',
 'https://www.googleapis.com/auth/gmail.modify',
@@ -134,24 +135,23 @@ def generateResponse(sender, to, subject, message_text):
     message['from'] = sender
     message['subject'] = subject
     return {'raw': base64.urlsafe_b64encode(message.as_string())}
-    
+
 
 def sendMessage(service, user_id, message):
-  """Send an email message.
+    """Send an email message.
 
-  Args:
+    Args:
     service: Authorized Gmail API service instance.
     user_id: User's email address. The special value "me"
     can be used to indicate the authenticated user.
     message: Message to be sent.
 
-  Returns:
-    Sent Message.
-  """
-  try:
-    message = (service.users().messages().send(userId=user_id, body=message)
-               .execute())
-    print 'Message Id: %s' % message['id']
-    return message
-  except errors.HttpError, error:
-    print 'An error occurred: %s' % error
+    Returns:
+    Sent Message."""
+
+    try:
+        message = service.users().messages().send(userId=user_id, body=message).execute()
+        print('Message Id:', message['id'])
+        return message
+    except Exception as error:
+        print('An error occurred: ', error)
