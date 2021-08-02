@@ -1,4 +1,5 @@
-from PIL import Image
+from PIL import ImageFile, Image
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 from PIL.ExifTags import TAGS
 from PIL.ExifTags import GPSTAGS
 import os
@@ -6,11 +7,13 @@ from glob import glob
 import psycopg2
 from contextlib import closing
 from time import sleep
+from headers import DB_CONNECTION_LOCAL, DB_CONNECTION_DOCKER
 
-DB_CONNECTION = "host={} user={} password={} dbname={} port={}".format(
-    os.environ["DBHOST"], os.environ["DBUSER"], os.environ["DBPASS"], os.environ["DBNAME"], os.environ["DBPORT"]
-)
+# local
+# DB_CONNECTION = DB_CONNECTION_LOCAL
 
+# docker
+DB_CONNECTION = DB_CONNECTION_DOCKER
 
 def get_geotagging(exif):
     if not exif:
@@ -64,13 +67,13 @@ def get_coordinates(geotags):
     return (lat, lon)
 
 
-def clean_img(filename, output_path):
-    photo = Image.open(filename)
-    data = list(photo.getdata())
-    no_exif = Image.new(photo.mode, photo.size)
-    no_exif.putdata(data)
-    no_exif.save(output_path)
-    return
+# def clean_img(filename, output_path):
+#     photo = Image.open(filename)
+#     data = list(photo.getdata())
+#     no_exif = Image.new(photo.mode, photo.size)
+#     no_exif.putdata(data)
+#     no_exif.save(output_path)
+#     return
 
 
 def insert_pg(sql):
@@ -80,48 +83,97 @@ def insert_pg(sql):
                 curs.execute(sql)
         conn.commit()
 
+def clean_and_resize(img):
+
+    image = Image.open(img)
+    width, height = image.size
+
+    w, h = int(width/7), int(height/7)
+    image = image.resize((w,h), Image.ANTIALIAS)
+
+    data = list(image.getdata())
+
+    no_exif = Image.new(image.mode, image.size)
+    no_exif.putdata(data)
+
+    newpath = img.replace("raw","ready").replace(img.split("/")[-1], "clean_"+img.split("/")[-1])
+
+    no_exif.save(newpath)
+
+    # return orientation, image
+    return image
+
 
 if __name__ == "__main__":
+    
+    while True:
+    
+    # print("Dude, suh!!!!")
+        sleep(5)
 
-    sleep(5)
+# docker
+        raw_img_dir = "/data/raw"
+        clean_dir = "/data/ready"
 
-    raw_img_dir = "/data/raw"
-    clean_dir = "/data/ready"
+# local
+    # raw_img_dir = "/home/ubuntu/workbench/roadtrip-gate/data/raw"
+    # clean_dir = "/home/ubuntu/workbench/roadtrip-gate/data/ready"
 
-    images = list(set(glob(os.path.join(raw_img_dir, "*.JPG")) + glob(os.path.join(raw_img_dir, "*.jpg"))))
+        images = list(set(glob(os.path.join(raw_img_dir, "*.JPG")) + glob(os.path.join(raw_img_dir, "*.jpg"))))
 
-    for img in images:
+        for img in images:
 
-        exif = get_exif(img)
-        metadata = get_labeled_exif(exif)
+            exif = get_exif(img)
+            metadata = get_labeled_exif(exif)
 
-        geotags = get_geotagging(exif)
-        lat, lon = get_coordinates(geotags)
+            try:
 
-        date_taken = metadata["DateTimeOriginal"]
-        guid_num = (
-            float(metadata["ApertureValue"])
-            * float(metadata["BrightnessValue"])
-            * float(metadata["ExposureTime"])
-            * lat
-            * lon
-        )
-        guid = f"{guid_num}_{date_taken}"
+                geotags = get_geotagging(exif)
+                lat, lon = get_coordinates(geotags)
 
-        clean_filename = f"clean_{os.path.basename(img)}"
-        output_img_path = os.path.join(clean_dir, clean_filename)
+                date_taken = metadata["DateTimeOriginal"]
+                guid_num = (
+                    float(metadata["ApertureValue"])
+                    * float(metadata["BrightnessValue"])
+                    * float(metadata["ExposureTime"])
+                    * lat
+                    * lon
+                )
+                guid = f"{guid_num}_{date_taken}"
 
-        if not os.path.exists(output_img_path):
+                clean_filename = f"clean_{os.path.basename(img)}"
+                output_img_path = os.path.join(clean_dir, clean_filename)
+                print(clean_dir, clean_filename)
 
-            clean_img(img, output_img_path)
+                if not os.path.exists(output_img_path):
 
-            insert_sql = f"""
-            INSERT INTO roadtrip.images VALUES (
-                '{guid}',
-                '{clean_filename}',
-                TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
-                ST_SetSRID(ST_Point({lon}, {lat}), 4326)
-            );
-            """
+                    final_img = clean_and_resize(img)
 
-            insert_pg(insert_sql)
+                    orientation = 'P'
+
+                    # clean_img(img, output_img_path)
+
+                    insert_sql = f"""
+                    INSERT INTO roadtrip.images VALUES (
+                        '{guid}',
+                        '{clean_filename}',
+                        TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
+                        ST_SetSRID(ST_Point({lon}, {lat}), 4326),
+                        '{orientation}'
+                    )
+                    ON CONFLICT (guid) DO UPDATE SET
+                        file_name = EXCLUDED.file_name,
+                        date_taken = EXCLUDED.date_taken,
+                        geom = EXCLUDED.geom,
+                        orientation = EXCLUDED.orientation
+                    ;
+                    """
+
+                    insert_pg(insert_sql)
+            
+            except ValueError:
+
+                image = Image.open(img)
+                newpath = img.replace("raw","nogeodata")
+                image.save(newpath)
+                pass
