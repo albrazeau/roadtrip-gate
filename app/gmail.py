@@ -43,6 +43,7 @@ def connectServer():
 
     return service
 
+
 def checkMessages(service, userId = 'me'):
   
     # request a list of all the messages
@@ -59,6 +60,7 @@ def checkMessages(service, userId = 'me'):
 
         msg_content = service.users().messages().get(userId=userId, id=msg['id']).execute()
         subject = ''
+        sender = ''
 
         for part in msg_content['payload']['parts']:
             if 'attachmentId' in part['body'].keys():
@@ -68,19 +70,88 @@ def checkMessages(service, userId = 'me'):
                 for element in msg_content['payload']['headers']:
                     if element['name'] == 'Subject':
                         subject = element['value']
+                    if element['name'] == 'From':
+                        sender = element['value']
                 
                 msg_body = msg_content['snippet']
                 attachmentId = part['body']['attachmentId']
 
-                attachmentObj = service.users().messages().attachments().get(
-                                userId=userId, 
-                                messageId=msg['id'],
-                                id=part['body']['attachmentId']
-                                ).execute()
+                pipeline_fields = extractMessageBody(msg_body)
 
-                attachment = base64.urlsafe_b64decode(
-                    attachmentObj["data"]
-                    )
+                if pipeline_fields['Valid'] == True:
 
-                with open(f"{subject}_{n}.JPG", "wb") as f:
-                    f.write(attachment)
+                    attachmentObj = service.users().messages().attachments().get(
+                                    userId=userId, 
+                                    messageId=msg['id']
+                                    id=part['body']['attachmentId']
+                                    ).execute()
+
+                    attachment = base64.urlsafe_b64decode(
+                        attachmentObj["data"]
+                        )
+
+                    photo_filepath = f"./data/raw/{subject}_{n}.JPG"
+
+                    with open(photo_filepath, "wb") as f:
+                        f.write(attachment)
+
+                    return photo_filepath, pipeline_fields
+
+def extractMessageBody(msg_body):
+
+    msg_body = msg_body.lower().split(",")
+    fields = {
+        'Location':'',
+        'Caption':'',
+        'Valid': False
+    }
+
+    if 'beepthisjeep' in msg_body.replace(" ",""):
+        fields['Valid'] = True
+
+    for msg in msg_body:
+        if 'location' in msg:
+            fields['Location'] = msg.replace('location','').capitalize().strip()
+        if 'caption' in msg:
+            fields['Caption'] = msg.replace('caption','').capitalize().strip()
+    
+    return fields
+
+def generateResponse(sender, to, subject, message_text):
+    """Create a message for an email.
+
+    Args:
+        sender: Email address of the sender.
+        to: Email address of the receiver.
+        subject: The subject of the email message.
+        message_text: The text of the email message.
+
+    Returns:
+        An object containing a base64url encoded email object.
+    """
+    message = MIMEText(message_text)
+    message['to'] = to
+    message['from'] = sender
+    message['subject'] = subject
+    return {'raw': base64.urlsafe_b64encode(message.as_string())}
+    
+
+def sendMessage(service, user_id, message):
+  """Send an email message.
+
+  Args:
+    service: Authorized Gmail API service instance.
+    user_id: User's email address. The special value "me"
+    can be used to indicate the authenticated user.
+    message: Message to be sent.
+
+  Returns:
+    Sent Message.
+  """
+  try:
+    message = (service.users().messages().send(userId=user_id, body=message)
+               .execute())
+    print 'Message Id: %s' % message['id']
+    return message
+  except errors.HttpError, error:
+    print 'An error occurred: %s' % error
