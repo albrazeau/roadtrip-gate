@@ -130,7 +130,7 @@ dmypy.json
 
 data/
 .vscode/
-headers.py
-client_secret.json
 
 *.json
+*.pickle
+headers.py
