@@ -134,3 +134,4 @@ headers.py
 client_secret.json
 
 *.json
+*.pickle
