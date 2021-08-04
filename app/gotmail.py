@@ -6,9 +6,17 @@ import os.path
 import base64
 import email
 from email.mime.text import MIMEText
-from bs4 import BeautifulSoup
+# from bs4 import BeautifulSoup
+# import html2text
 from geopy.geocoders import Nominatim
-# from headers import GEOPY_USRNAME
+from headers import GEOPY_USRNAME, VALID_EMAILS
+import re
+from pipeline import get_exif, get_coordinates, get_geotagging, get_labeled_exif
+
+def extractEmail(text:str):
+    match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', text)
+    if match:
+        return match.group(0)
 
 
 # Define the SCOPES. If modifying it, delete the token.pickle file.
@@ -37,63 +45,151 @@ image_dictionary = {}
 for msg in messages:
 
     msg_content = service.users().messages().get(userId='me', id=msg['id']).execute()
-    
-    if 'beepthisjeep' in msg_content['snippet'].lower().replace(" ",""):
-        photo_information = {}
+    photo_information = {}
+    n = 1
 
-        for part in msg_content['payload']['parts']:
-            if 'attachmentId' in part['body'].keys():
+    # extract subject and validate sender 
+    for element in msg_content['payload']['headers']:
+        print(element)
+        if element['name'] == 'Subject':
+            location, caption = element['value'].split(";")
+            photo_information['Location'] = location
+            photo_information['Caption'] = caption
 
-                for element in msg_content['payload']['headers']:
-                    if element['name'] == 'Subject':
-                        
-                        photo_information['location'] = element['value'].split(";")[0]
-                        photo_information['caption'] = element['value'].split(";")[-1]
+        if element['name'] == 'From' and extractEmail(element['value']) in VALID_EMAILS:
+            photo_information['Valid'] = True
 
-                    if element['name'] == 'From':
-                        photo_information['sender'] = element['value']
-
-                photo_information['attachmentId'] = part['body']['attachmentId']
+    for part in msg_content['payload']['parts']:
+        if 'attachmentId' in part['body'].keys():
+            # print(part['body']['attachmentId'])
 
             if msg['id'] in image_dictionary.keys():
-                image_dictionary[msg['id']].append(photo_information)
+                image_dictionary[msg['id']]['Attachments'].append(part['body']['attachmentId'])
             else:
-                image_dictionary[msg['id']] = [photo_information]
-    
+                photo_information['Attachments'] = []
+                photo_information['Attachments'].append(part['body']['attachmentId'])
+                image_dictionary[msg['id']] = photo_information
 
-for k, v in image_dictionary.items():
+    for k, v in image_dictionary.items():
+        n = 1
 
-    attachmentObj = service.users().messages().attachments().get(
+        path = '/home/ubuntu/workbench/roadtrip-gate/data/raw'
+
+        for ea_img in v['Attachments']:
+            attachmentObj = service.users().messages().attachments().get(
                     userId='me', 
                     messageId=k,
-                    id=v['attachmentId']
+                    id=ea_img
                     ).execute()
 
+            path = os.path.join(path, f"{v['Location']}.JPG")
+            print(path)
 
-            # pipeline_fields = extractMessageBody(msg_body)
+            
 
-            # if pipeline_fields['Valid'] == True:
+def imageFromBytes(byte_string: str, image_path):
 
-            #     attachmentObj = service.users().messages().attachments().get(
-            #                     userId=userId, 
-            #                     messageId=msg['id'],
-            #                     id=part['body']['attachmentId']
-            #                     ).execute()
+    attachment = base64.urlsafe_b64decode(
+                byte_string
+                )
 
-            #     attachment = base64.urlsafe_b64decode(
-            #         attachmentObj["data"]
-            #         )
+    if not os.path.exists(image_path):
+        with open(image_path, "wb") as f:
+            f.write(attachment)
 
-            #     photo_filepath = f"./data/raw/{subject}_{n}.JPG"
+def loadDatabase(imagepath, image_data):
+
+    exif = get_exif(img)
+    metadata = get_labeled_exif(exif)
+    geotags = get_geotagging(exif)
+    lat, lon = get_coordinates(geotags)
+
+    if not lat and lon:
+        location = add_geolocation(v['Location'])
+        print("didn't work")
+
+        if not location:
+            # Send email that this didn't work
+        
+
+
+
+    print(geotags, lat, lon)
+
+            clean_filename = f"clean_{os.path.basename(v['Caption'])}{n}"
+
+            output_img_path = os.path.join(clean_dir, clean_filename)
+
+            if not os.path.exists(output_img_path):
+                with open(output_img_path, "wb") as f:
+                    f.write(attachment)
+
+        if add_geolocation(v['Location']):
+            print(v['Location'])
+            print(add_geolocation(v['Location']))
+        else:
+            ### Send email saying there was an error
+            pass
+
+
+                geotags = get_geotagging(exif)
+                lat, lon = get_coordinates(geotags)
+
+                date_taken = metadata["DateTimeOriginal"]
+                guid_num = (
+                    float(metadata["ApertureValue"])
+                    * float(metadata["BrightnessValue"])
+                    * float(metadata["ExposureTime"])
+                    * lat
+                    * lon
+                )
+                guid = f"{guid_num}_{date_taken}"
+
+                clean_filename = f"clean_{os.path.basename(img)}"
+                output_img_path = os.path.join(clean_dir, clean_filename)
+                print(clean_dir, clean_filename)
+
+                if not os.path.exists(output_img_path):
+
+                    final_img = clean_and_resize(img)
+
+                    # clean_img(img, output_img_path)
+
+                    insert_sql = f"""
+                    INSERT INTO roadtrip.images VALUES (
+                        '{guid}',
+                        '{clean_filename}',
+                        TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
+                        ST_SetSRID(ST_Point({lon}, {lat}), 4326),
+                        '{orientation}'
+                    )
+                    ON CONFLICT (guid) DO UPDATE SET
+                        file_name = EXCLUDED.file_name,
+                        date_taken = EXCLUDED.date_taken,
+                        geom = EXCLUDED.geom,
+                        orientation = EXCLUDED.orientation
+                    ;
+                    """
+
+                    insert_pg(insert_sql)
 
 
 def add_geolocation(city_and_state: str) -> tuple:
 
-    geolocator = Nominatim(user_agent='test')
+    geolocator = Nominatim(user_agent=GEOPY_USRNAME)
     location = geolocator.geocode(city_and_state)
 
     if location:
-        return location.latitude, location.longitude
+        return (location.latitude, location.longitude)
         
     else:
-        return "No location data found.", None
+        return None
+
+
+# docker
+        raw_img_dir = "/data/raw"
+        clean_dir = "/data/ready"
+
+# local
+    # raw_img_dir = "/home/ubuntu/workbench/roadtrip-gate/data/raw"
+    # clean_dir = "/home/ubuntu/workbench/roadtrip-gate/data/ready"
