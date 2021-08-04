@@ -67,15 +67,6 @@ def get_coordinates(geotags):
     return (lat, lon)
 
 
-# def clean_img(filename, output_path):
-#     photo = Image.open(filename)
-#     data = list(photo.getdata())
-#     no_exif = Image.new(photo.mode, photo.size)
-#     no_exif.putdata(data)
-#     no_exif.save(output_path)
-#     return
-
-
 def insert_pg(sql):
     with closing(psycopg2.connect(DB_CONNECTION)) as conn:
         with conn:
@@ -85,7 +76,7 @@ def insert_pg(sql):
 
 def clean_and_resize(img):
 
-    image = Image.open(img)
+    image = Image.open(img.replace("ready","raw"))
     width, height = image.size
 
     w, h = int(width/7), int(height/7)
@@ -96,11 +87,8 @@ def clean_and_resize(img):
     no_exif = Image.new(image.mode, image.size)
     no_exif.putdata(data)
 
-    newpath = img.replace("raw","ready").replace(img.split("/")[-1], "clean_"+img.split("/")[-1])
+    no_exif.save(img)
 
-    no_exif.save(newpath)
-
-    # return orientation, image
     return image
 
 
@@ -149,8 +137,6 @@ if __name__ == "__main__":
 
                     final_img = clean_and_resize(img)
 
-                    orientation = 'P'
-
                     # clean_img(img, output_img_path)
 
                     insert_sql = f"""
@@ -177,3 +163,5 @@ if __name__ == "__main__":
                 newpath = img.replace("raw","nogeodata")
                 image.save(newpath)
                 pass
+
+

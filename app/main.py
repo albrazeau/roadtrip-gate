@@ -33,7 +33,7 @@ def my_utility_processor():
                             guid,
                             file_name,
                             date_taken,
-                            orientation,
+                            caption,
                             ST_X(geom) AS lon_x,
                             ST_Y(geom) AS lat_y
                         FROM
