@@ -13,12 +13,16 @@ import os.path
 import base64
 import re
 import psycopg2
+import random
 
 from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
 from geopy.geocoders import Nominatim
 from datetime import datetime
 from time import sleep
 
+from functools import partial
+
+print = partial(print, flush=True)
 
 # local
 DB_CONNECTION = DB_CONNECTION_LOCAL
@@ -135,6 +139,8 @@ def add_geolocation(city_and_state: str) -> tuple:
 
 
 def connectGmail(token = 'token.pickle'):
+    
+    print('Establishing connection to GMAIL.')
 
     # Define the SCOPES. If modifying it, delete the token.pickle file.
     SCOPES = ['https://mail.google.com/',
@@ -208,6 +214,8 @@ def dataPipeline(image_dictionary):
 
         for ea_img in v['Attachments']:
 
+            print('Processing image')
+
             attachmentObj = service.users().messages().attachments().get(
                     userId='me', 
                     messageId=k,
@@ -250,15 +258,17 @@ def dataPipeline(image_dictionary):
                 except:
                     date_taken = datetime.now().strftime("%Y:%m:%d")
                 guid_num = (
-                    float(metadata["ApertureValue"])
-                    * float(metadata["BrightnessValue"])
-                    * float(metadata["ExposureTime"])
+                    float(metadata.get("ApertureValue", random.randint(1, 200))) *
+                    float(metadata.get('BrightnessValue', random.randint(1, 200)))*
+                    float(metadata.get('ExposureTime', random.randint(1, 200)))
                     * lat
                     * lon
                 )
                 guid = f"{guid_num}_{date_taken}"
 
                 final_path = os.path.join(ready_path, img_name)
+
+                print(f'Final image ready for saving. Final path: ', final_path)
                     
                 final_img = clean_and_resize(final_path)
 
@@ -287,11 +297,16 @@ def dataPipeline(image_dictionary):
 
                 insert_pg(insert_sql)
 
+                print("Completed. ", final_path)
+
 if __name__ == "__main__":
     
+    print("Starting")
     while True:
 
         service = connectGmail()
         img_dict = fetchEmailData(service)
         dataPipeline(img_dict)
+
+        print("Sleeping")
         sleep(60)
