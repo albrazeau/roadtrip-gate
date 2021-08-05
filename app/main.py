@@ -30,10 +30,10 @@ def my_utility_processor():
     def create_map():
         
         fetch_sql = f"""SELECT
-                            guid,
-                            file_name,
-                            date_taken,
+                            attachment_id,
+                            filepath,
                             caption,
+                            date_taken,
                             ST_X(geom) AS lon_x,
                             ST_Y(geom) AS lat_y
                         FROM
@@ -57,18 +57,18 @@ def my_utility_processor():
 
         for idx in range(len(df)):
 
-            img_name = df.iloc[idx]['file_name']
-            fullpath = f"{clean_dir}/{img_name}"
+            img_name = df.iloc[idx]['caption']
+            filepath = df.iloc[idx]['filepath']
             lon = df.iloc[idx]['lon_x']
             lat = df.iloc[idx]['lat_y']
 
             # resize appropriately
-            image = Image.open(fullpath)
+            image = Image.open(filepath)
             width, height = image.size
             width = width + 25
             height = height + 25
 
-            encoded = base64.b64encode(open(fullpath, 'rb').read())
+            encoded = base64.b64encode(open(filepath, 'rb').read())
             html = '<img src="data:image/JPG;base64,{}">'.format
             
             iframe = IFrame(html(encoded.decode("UTF-8")), width=width, height=height)

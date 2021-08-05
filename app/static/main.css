@@ -6,7 +6,7 @@ html, body {
     margin: auto;
     width: 1500px; 
     font-family: 'Roboto', sans-serif;
-    font-size: 120%;
+    font-size: 115%;
   }
 
   .pagewidth {  /* width of content box remains the same, even when zoomed in or out (note that the text still spreads out as the page grows) */
