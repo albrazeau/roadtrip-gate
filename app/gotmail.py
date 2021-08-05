@@ -15,7 +15,8 @@ import re
 import psycopg2
 import random
 
-from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
+# from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
+from headers import GEOPY_USRNAME, VALID_EMAILS
 from geopy.geocoders import Nominatim
 from datetime import datetime
 from time import sleep
@@ -25,7 +26,7 @@ from functools import partial
 print = partial(print, flush=True)
 
 # local
-DB_CONNECTION = DB_CONNECTION_LOCAL
+# DB_CONNECTION = DB_CONNECTION_LOCAL
 
 # docker
 # DB_CONNECTION = DB_CONNECTION_DOCKER
@@ -111,20 +112,20 @@ def extractEmail(text:str):
     if match:
         return match.group(0)
 
-def imageFromBytes(byte_string: str, path, img_name):
+# def imageFromBytes(byte_string: str, path, img_name):
 
-    pathway = os.path.join(path, img_name)
+#     pathway = os.path.join(path, img_name)
 
-    attachment = base64.urlsafe_b64decode(
-                byte_string
-                )
+#     attachment = base64.urlsafe_b64decode(
+#                 byte_string
+#                 )
 
-    if not os.path.exists(pathway):
-        with open(pathway, "wb") as f:
-            f.write(attachment)
-            return None
+#     if not os.path.exists(pathway):
+#         with open(pathway, "wb") as f:
+#             f.write(attachment)
+#             return None
     
-    return "Error translating image from bytes."
+#     return "Error translating image from bytes."
 
 def add_geolocation(city_and_state: str) -> tuple:
 
@@ -176,10 +177,18 @@ def fetchEmailData(gmail_connection):
         photo_information = {}
         n = 1
 
+        if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
+            date = msg_content['snippet'].lower().split('date:')[1].split(';')[0]
+            photo_information['Date'] = date
+
+
         # parse message object to pull subject data and validate sender in payload HEADERS
         for element in msg_content['payload']['headers']:
             if element['name'] == 'Subject':
-                location, caption = element['value'].split(";")
+                if ';' in element['value']:
+                    location, caption = element['value'].split(";")
+                else:
+                    location, caption = element['value'], element['value']
                 photo_information['Location'] = location
                 photo_information['Caption'] = caption
 
@@ -196,8 +205,46 @@ def fetchEmailData(gmail_connection):
                     photo_information['Attachments'] = []
                     photo_information['Attachments'].append(part['body']['attachmentId'])
                     image_dictionary[msg['id']] = photo_information
+            if 'filename' in part['body'].keys():
+                print(part['body']['filename'])
     
     return image_dictionary
+
+def loadRawImages(image_dictionary, service):
+
+    for message_key, message_value in image_dictionary.items():
+        n = 1
+
+        # LOCAL PATH
+        raw_path = '/home/ubuntu/workbench/roadtrip-gate/data/raw'
+
+        # IN DOCKER
+        # raw_path = '/data/raw'
+
+        for img_id in message_value['Attachments']:
+
+            if not img_id in 
+
+            print('Processing Image (loading to raw folder.')
+
+            attachmentObj = service.users().messages().attachments().get(
+                    userId='me', 
+                    messageId=message_key,
+                    id=img_id
+                    ).execute()
+
+            img_name = re.sub("[^a-zA-Z]+", "", img_id) + '.JPG'
+
+            pathway = os.path.join(raw_path, img_name)
+
+            attachmentImg = base64.urlsafe_b64decode(
+                attachmentObj['data']
+                )
+
+            if not os.path.exists(pathway):
+                with open(pathway, "wb") as f:
+                    f.write(attachmentImg)
+
 
 def dataPipeline(image_dictionary):
 
@@ -298,6 +345,21 @@ def dataPipeline(image_dictionary):
                 insert_pg(insert_sql)
 
                 print("Completed. ", final_path)
+
+
+def checkExists(img_id):
+
+    check_img = f"""
+                SELECT * FROM roadtrip.images WHERE attachment_id = {img_id};
+                """
+
+    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+        with conn:
+            exists = pd.read_sql(check_img, conn)
+
+    if exists:
+        return True
+    return False
 
 if __name__ == "__main__":
     
