@@ -43,15 +43,19 @@ def my_utility_processor():
             df = pd.read_sql(fetch_sql, conn)
 
         folium_map = folium.Map(location=US_CENTER, 
-        zoom_start=4, scrollWheelZoom=False)
+        zoom_start=4, scrollWheelZoom=False, tiles=None)
 
         draw_line = list(df.sort_values(by='date_taken')[['lat_y', 'lon_x']].apply(tuple, axis=1))
         folium.PolyLine(draw_line, color="#c20dff", weight=2.5, opacity=1).add_to(folium_map)
 
-
         folium_map.add_child(plugins.Geocoder())
-        folium.TileLayer('openstreetmap').add_to(folium_map)
-        folium.TileLayer('Stamen Terrain').add_to(folium_map)
+        folium.TileLayer('openstreetmap', name = 'Street').add_to(folium_map)
+        folium.TileLayer('Stamen Terrain', name = 'Terrain').add_to(folium_map)
+        folium.TileLayer(
+            tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+            attr = 'Esri',
+            name = 'Satellite'
+        ).add_to(folium_map)
         folium.LayerControl().add_to(folium_map)
         folium_map.add_child(plugins.Fullscreen(position='topleft', title='Full Screen', title_cancel='Exit Full Screen', force_separate_button=False))
 

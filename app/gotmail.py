@@ -115,6 +115,7 @@ def resize_and_save(old_filepath, new_filepath):
     no_exif.putdata(data)
 
     no_exif.save(new_filepath)
+    os.remove(old_filepath)
 
 
 def extractEmail(text:str):
@@ -209,42 +210,52 @@ def fetchEmailData(gmail_connection):
 
     # iterate through all the messages
     for msg in messages:
+        
+        check_content = f"""
+                    SELECT email_id FROM roadtrip.images;
+                    """
 
-        msg_content = gmail_connection.users().messages().get(userId='me', id=msg['id']).execute()
-        photo_information = {}
-        n = 1
+        with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+            with conn:
+                df = pd.read_sql(check_content, conn)
 
-        if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
-            date = msg_content['snippet'].lower().split('date:')[1].split(';')[0]
-            photo_information['Date'] = datetime.strptime(date, '%d/%m/%Y')
+            if not msg['id'] in df.email_id.to_list():
+
+                msg_content = gmail_connection.users().messages().get(userId='me', id=msg['id']).execute()
+                photo_information = {}
+                n = 1
+
+                if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
+                    date = msg_content['snippet'].lower().split('date:')[1].split(';')[0]
+                    photo_information['Date'] = datetime.strptime(date, '%d/%m/%Y')
 
 
-        # parse message object to pull subject data and validate sender in payload HEADERS
-        for element in msg_content['payload']['headers']:
-            if element['name'] == 'Subject':
-                if ';' in element['value']:
-                    location, caption = element['value'].split(";")
-                else:
-                    location, caption = element['value'], element['value']
-                photo_information['Location'] = location
-                photo_information['Caption'] = caption
+                # parse message object to pull subject data and validate sender in payload HEADERS
+                for element in msg_content['payload']['headers']:
+                    if element['name'] == 'Subject':
+                        if ';' in element['value']:
+                            location, caption = element['value'].split(";")
+                        else:
+                            location, caption = element['value'], element['value']
+                        photo_information['Location'] = location
+                        photo_information['Caption'] = caption
 
-            if element['name'] == 'From' and extractEmail(element['value']) in VALID_EMAILS:
-                photo_information['Valid'] = True
+                    if element['name'] == 'From' and extractEmail(element['value']) in VALID_EMAILS:
+                        photo_information['Valid'] = True
 
-        # parse message oject for attachments in payload PARTS
-        for part in msg_content['payload']['parts']:
-            if 'attachmentId' in part['body'].keys():
+                # parse message oject for attachments in payload PARTS
+                for part in msg_content['payload']['parts']:
+                    if 'attachmentId' in part['body'].keys():
 
-                if msg['id'] in image_dictionary.keys():
-                    image_dictionary[msg['id']]['Attachments'].append(part['body']['attachmentId'])
-                else:
-                    photo_information['Attachments'] = []
-                    photo_information['Attachments'].append(part['body']['attachmentId'])
-                    image_dictionary[msg['id']] = photo_information
-            if 'filename' in part['body'].keys():
-                print(part['body']['filename'])
-    
+                        if msg['id'] in image_dictionary.keys():
+                            image_dictionary[msg['id']]['Attachments'].append(part['body']['attachmentId'])
+                        else:
+                            photo_information['Attachments'] = []
+                            photo_information['Attachments'].append(part['body']['attachmentId'])
+                            image_dictionary[msg['id']] = photo_information
+                    if 'filename' in part['body'].keys():
+                        print(part['body']['filename'])
+        
     return image_dictionary
 
 
@@ -304,7 +315,6 @@ def loadRawImages(image_dictionary, service):
                 photo_location = message_value.get('Location', None)
                 caption = message_value.get('Caption', None)
                 filepath = filepath
-                date_taken = message_value.get('Date', datetime.now())
 
                 if "'" in caption and caption.count("'")%2:
                     idx = caption.index("'")
@@ -323,6 +333,7 @@ def loadRawImages(image_dictionary, service):
                 
                 except:
                     lat, lon = add_geolocation(photo_location)
+                    date_taken = message_value.get('Date', datetime.now())
 
                 if not lat and not lon:
                     lon, lat = DEFAULT_GEO
@@ -333,143 +344,10 @@ def loadRawImages(image_dictionary, service):
                     insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
                     resize_and_save(filepath, filepath.replace("raw", "ready"))
 
-# def processRawImages():
-
-#     raw_images = list(set(glob(os.path.join(RAW_PATH, "*.JPG")) + glob(os.path.join(RAW_PATH, "*.jpg"))))
-#     ready_images = list(set(glob(os.path.join(READY_PATH, "*.JPG")) + glob(os.path.join(READY_PATH, "*.jpg"))))
-
-#     for ea_img in raw_images:
-
-#         if not ea_img.replace("raw", "ready") in ready_images:
-
-#             df = getImgData(ea_img)
-
-#             for ea in range(len(df)):
-#                 attachment_id = df.iloc[ea]['attachment_id']
-#                 email_id = df.iloc[ea]['email_id']
-#                 photo_location = df.iloc[ea]['photo_location']
-#                 caption = df.iloc[ea]['caption']
-#                 date_taken = df.iloc[ea]['date_taken']
-
-
-                # try:
-                #     exif = get_exif(ea_img)
-                #     metadata = get_labeled_exif(exif)
-                #     geotags = get_geotagging(exif)
-                #     lat, lon = get_coordinates(geotags)
-                #     date_taken = metadata["DateTimeOriginal"]
-
-                # except:
-                #     lat, lon = add_geolocation(photo_location)
-
-                # if not lat and not lon:
-                #     lat, lon = None, None
-                #     clean_resize_insert(ea_img, attachment_id, date_taken, lat, lon)
-                
-                
-                # else:
-
-                #     clean_resize_insert(ea_img, attachment_id, date_taken, lat, lon)
-
-# def dataPipeline(image_dictionary):
-
-#     for k, v in image_dictionary.items():
-#         n = 1
-
-#         for ea_img in v['Attachments']:
-
-#             print('Processing image')
-
-#             attachmentObj = service.users().messages().attachments().get(
-#                     userId='me', 
-#                     messageId=k,
-#                     id=ea_img
-#                     ).execute()
-            
-#             img_name = re.sub("[^a-zA-Z]+", "", f"{v['Caption']}") + f'_{n}.JPG'
-#             n+= 1
-
-#             # load image into RAW DATA FOLDER 
-#             # returns NONE if there is no pipeline error
-#             pipeline_error = imageFromBytes(attachmentObj['data'], RAW_PATH, img_name)
-
-#             if pipeline_error:
-#                 # CALL FUNCTION TO SEND EMAIL THAT THERE WAS AN ISSUE
-#                 # break
-#                 pass
-#             if not pipeline_error:
-
-#                 pathway = os.path.join(RAW_PATH, img_name)
-
-#                 try:
-#                     exif = get_exif(pathway)
-#                     metadata = get_labeled_exif(exif)
-#                     geotags = get_geotagging(exif)
-#                     lat, lon = get_coordinates(geotags)
-
-#                 except:
-#                     exif = get_exif(pathway)
-#                     metadata = get_labeled_exif(exif)
-#                     location = add_geolocation(v['Location'])
-#                     if not location:
-#                         # CALL FUNCTION TO SEND EMAIL THERE WAS AN ISSUE
-#                         pass
-                    
-#                     lat, lon = location
-
-#                 try:
-#                     date_taken = metadata["DateTimeOriginal"]
-#                 except:
-#                     date_taken = datetime.now().strftime("%Y:%m:%d")
-#                 guid_num = (
-#                     float(metadata.get("ApertureValue", random.randint(1, 200))) *
-#                     float(metadata.get('BrightnessValue', random.randint(1, 200)))*
-#                     float(metadata.get('ExposureTime', random.randint(1, 200)))
-#                     * lat
-#                     * lon
-#                 )
-#                 guid = f"{guid_num}_{date_taken}"
-
-#                 final_path = os.path.join(ready_path, img_name)
-
-#                 print(f'Final image ready for saving. Final path: ', final_path)
-                    
-#                 final_img = clean_and_resize(final_path)
-
-#                 if "'" in v['Caption'] and v['Caption'].count("'")%2:
-#                     idx = v['Caption'].index("'")
-#                     v['Caption'] = v['Caption'][:idx] + "'" + v['Caption'][idx:]
-#                     print(v['Caption'])
-
-#                 insert_sql = f"""
-#                         INSERT INTO roadtrip.images VALUES (
-#                             '{guid}',
-#                             '{k}',
-#                             '{final_path.split('/')[-1]}',
-#                             TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
-#                             ST_SetSRID(ST_Point({lon}, {lat}), 4326),
-#                             '{v['Caption']}'
-#                         )
-#                         ON CONFLICT (guid) DO UPDATE SET
-#                             email_id = EXCLUDED.email_id,
-#                             file_name = EXCLUDED.file_name,
-#                             date_taken = EXCLUDED.date_taken,
-#                             geom = EXCLUDED.geom,
-#                             caption = EXCLUDED.caption
-#                         ;
-#                         """
-
-#                 insert_pg(insert_sql)
-
-#                 print("Completed. ", final_path)
-
-
-
-
 if __name__ == "__main__":
 
     try:
-    
+        sleep(15)
         print("Starting")
         while True:
 
@@ -478,7 +356,7 @@ if __name__ == "__main__":
             loadRawImages(img_dict, server)
 
             print("Sleeping")
-            sleep(60)
+            sleep(60 * 10)
     
     except Exception as e:
         logging.error("This is the error: %s", e, exc_info=1)

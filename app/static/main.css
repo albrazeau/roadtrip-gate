@@ -30,7 +30,6 @@ html, body {
     border-radius: 3px;
     padding: 4px 8px;
     font-weight: bold;
-    cursor: pointer;
     box-sizing: border-box;
     align-items: center;
     align-content: center;
@@ -46,3 +45,36 @@ html, body {
   .titleblock h1 {
     margin-left: 20%;
   }
+
+/* Footer */
+.footer {
+  background-color: #f8f8f8;
+  width: 100%;
+  padding: 1%;
+  margin: 2.5%;
+  display: flex;
+  flex-direction: row;
+  margin: auto;
+  color: black;
+  /* font-size: 40%; */
+  overflow: none;
+  padding-top: 0%;
+  padding-bottom: 1%;
+}
+
+.rightsreserved {
+  padding-left: 75%;
+  padding-right: 3%;
+  text-align: right;
+  color: black;
+  margin: auto;
+  font-size: 50%;
+}
+
+.madebyAE {
+  padding-left: 3%;
+  background-color: transparent;
+  margin: auto;
+  color: black;
+  font-size: 50%;
+}
