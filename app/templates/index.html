@@ -8,6 +8,8 @@
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://unpkg.com/blocks.css/dist/blocks.min.css" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Rancho&effect=shadow-multiple" />
+    <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Montserrat" />
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png' ) }}">
     <title>Beep This Jeep</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
@@ -29,15 +31,16 @@
                 We're Ally and Alec 👋
             </h2>
             <h4>
-                We're on an open-ended roadtrip exploring the United States to find the next city we want to call home.
-                <br><br>
-                We made this site to share some of the highlights of our adventure with friends and
-                family. Enjoy!
+                This is a photo map of our journey across the US. We wanted a change of pace but didn't know exactly
+                where we wanted to live. Instead, we set out on a roadtrip to see new places, explore the National Park
+                system, and find a new city to call home. Enjoy!
             </h4>
         </div>
 
+
         <div class="editor fixed block" style="width:100%">{{ create_map() }}</div>
         <br><br><br><br>
+
     </div>
 
     <div class="footer">
@@ -49,6 +52,7 @@
         </div>
 
     </div>
+
 </body>
 
 </html>

@@ -106,7 +106,14 @@ def resize_and_save(old_filepath, new_filepath):
     image = Image.open(old_filepath)
     width, height = image.size
 
-    w, h = int(width/7), int(height/7)
+    if width >= height:
+        w = 441
+        h = 330
+
+    if height >= width:
+        w = 219
+        h = 292
+
     image = image.resize((w,h), Image.ANTIALIAS)
 
     data = list(image.getdata())
@@ -122,21 +129,6 @@ def extractEmail(text:str):
     match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', text)
     if match:
         return match.group(0)
-
-# def imageFromBytes(byte_string: str, path, img_name):
-
-#     pathway = os.path.join(path, img_name)
-
-#     attachment = base64.urlsafe_b64decode(
-#                 byte_string
-#                 )
-
-#     if not os.path.exists(pathway):
-#         with open(pathway, "wb") as f:
-#             f.write(attachment)
-#             return None
-    
-#     return "Error translating image from bytes."
 
 def add_geolocation(city_and_state: str) -> tuple:
 
