@@ -43,6 +43,11 @@ html, body {
     z-index: 1;
   }
 
+  .map {
+    width: 100%; 
+    height: 70vh;
+  }
+
   h4 {
     font-family: "Montserrat";
     font-size: 95%;
@@ -82,4 +87,25 @@ html, body {
   margin: auto;
   font-family: "Montserrat";
   font-size: 30%;
+}
+
+@media only screen and (max-width: 600px) {
+  html, body {
+    font-size: 105%;
+  }
+  .titleblock {
+    margin: 8px 6px 1px 6px;
+  }
+
+  img {
+    width: 50%;
+    padding: 0;
+    margin: 0;
+  }
+
+  .map {
+    width: 100%; 
+    height: 40vh;
+  }
+
 }
