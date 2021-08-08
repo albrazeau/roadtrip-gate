@@ -110,9 +110,6 @@ def map():
     folium_map = folium.Map(location=US_CENTER, 
     zoom_start=4, scrollWheelZoom=False, tiles=None)
 
-    draw_line = list(df.sort_values(by='date_taken')[['lat_y', 'lon_x']].apply(tuple, axis=1))
-    folium.PolyLine(draw_line, color="#c20dff", weight=2.5, opacity=1).add_to(folium_map)
-
     folium_map.add_child(plugins.Geocoder())
     folium.TileLayer('openstreetmap', name = 'Street').add_to(folium_map)
     folium.TileLayer('Stamen Terrain', name = 'Terrain').add_to(folium_map)
@@ -137,23 +134,35 @@ def map():
         width = width + 25
         height = height + 25
 
-        encoded = base64.b64encode(open(filepath, 'rb').read())
-        html = '<img src="data:image/JPG;base64,{}">'.format(encoded.decode("UTF-8"))
-        
-        iframe = IFrame(html, width=width, height=height)
-        
-        # iframe = f"<iframe><img src={url_for('static', filename='./jeep.png')}> width={width} height={height}</iframe> "
+        # nesting the image loading and route mapping to a try except-- top candidate for future refactor
 
-        popup = folium.Popup(iframe, max_width=width+25)
-        tooltip = img_name.replace("_"," ")
-    
-        folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
+        try:
+
+            encoded = base64.b64encode(open(filepath, 'rb').read())
+            html = '<img src="data:image/JPG;base64,{}">'.format(encoded.decode("UTF-8"))
+            
+            iframe = IFrame(html, width=width, height=height)
+            
+            # iframe = f"<iframe><img src={url_for('static', filename='./jeep.png')}> width={width} height={height}</iframe> "
+
+            popup = folium.Popup(iframe, max_width=width+25)
+            tooltip = img_name.replace("_"," ")
+        
+            folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
+
+        except:
+            pass
+
+    try:
+        draw_line = list(df.sort_values(by='date_taken')[['lat_y', 'lon_x']].apply(tuple, axis=1))
+        folium.PolyLine(draw_line, color="#c20dff", weight=2.5, opacity=1).add_to(folium_map)
+    except:
+        pass
 
     folium_map.save('templates/map.html')
 
     return render_template('map.html') 
     # return ""
-
 
 if __name__ == "__main__":
     app.run(debug=True)

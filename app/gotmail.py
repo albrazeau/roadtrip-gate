@@ -139,7 +139,7 @@ def add_geolocation(city_and_state: str) -> tuple:
         return (location.latitude, location.longitude)
         
     else:
-        return None
+        return (None, None)
 
 def imgExists(img_id):
 
@@ -218,8 +218,11 @@ def fetchEmailData(gmail_connection):
                 n = 1
 
                 if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
-                    date = msg_content['snippet'].lower().split('date:')[1].split(';')[0]
-                    photo_information['Date'] = datetime.strptime(date, '%d/%m/%Y')
+                    date = msg_content['snippet'].lower().split('date:')[1].split(';')[0].strip().title()
+                    if not ":" in date:
+                        date += ' 0:00 AM'
+                    photo_information['Date'] = datetime.strptime(date.replace(",", ""), '%B %d %Y %H:%M %p')
+
 
 
                 # parse message object to pull subject data and validate sender in payload HEADERS
@@ -348,8 +351,9 @@ if __name__ == "__main__":
             loadRawImages(img_dict, server)
 
             print("Sleeping")
-            sleep(60 * 10)
+            sleep(20)
     
     except Exception as e:
         logging.error("This is the error: %s", e, exc_info=1)
         raise e
+        pass
