@@ -19,7 +19,6 @@ from glob import glob
 import logging
 
 from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
-# from headers import GEOPY_USRNAME, VALID_EMAILS
 from geopy.geocoders import Nominatim
 from datetime import datetime
 from time import sleep
@@ -174,8 +173,7 @@ def connectGmail(token = 'token.json'):
     print('Establishing connection to GMAIL.')
 
     # Define the SCOPES. If modifying it, delete the token.pickle file.
-    SCOPES = ['https://mail.google.com/',
-    'https://www.googleapis.com/auth/gmail.readonly']
+    SCOPES = ['https://www.googleapis.com/auth/gmail.readonly']
 
     creds = None
     # The file token.json stores the user's access and refresh tokens, and is

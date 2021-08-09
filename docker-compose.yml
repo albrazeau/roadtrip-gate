@@ -29,7 +29,7 @@ services:
           - ./.env
       labels:
         - 'traefik.enable=true'
-        - 'traefik.http.routers.my-app.rule=Host(`18.221.120.217`)'
+        - 'traefik.http.routers.my-app.rule=Host(`beepthisjeep.com`)'
         - 'traefik.http.routers.my-app.tls=true'
         - 'traefik.http.routers.my-app.tls.certresolver=lets-encrypt'
         - 'traefik.docker.network=traefik_default'

@@ -135,3 +135,6 @@ data/
 *.pickle
 headers.py
 traefik/
+traefik/*
+map.html
+traefik/traefik.toml
