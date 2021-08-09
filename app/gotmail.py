@@ -1,6 +1,7 @@
 from googleapiclient.discovery import build
 from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
+from google.oauth2.credentials import Credentials
 
 from PIL import ImageFile, Image
 ImageFile.LOAD_TRUNCATED_IMAGES = True
@@ -145,14 +146,25 @@ def connectGmail(token = 'token.pickle'):
 
     # Define the SCOPES. If modifying it, delete the token.pickle file.
     SCOPES = ['https://mail.google.com/',
-    'https://www.googleapis.com/auth/gmail.modify',
     'https://www.googleapis.com/auth/gmail.readonly']
 
-    if os.path.exists('token.pickle'):
-
-        # Read the token from the file and store it in the variable creds
-        with open('token.pickle', 'rb') as token:
-            creds = pickle.load(token)
+    creds = None
+    # The file token.json stores the user's access and refresh tokens, and is
+    # created automatically when the authorization flow completes for the first
+    # time.
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    # If there are no (valid) credentials available, let the user log in.
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                'credentials.json', SCOPES)
+            creds = flow.run_local_server(port=0)
+        # Save the credentials for the next run
+        with open('token.json', 'w') as token:
+            token.write(creds.to_json())
 
     service = build('gmail', 'v1', credentials=creds)
 
