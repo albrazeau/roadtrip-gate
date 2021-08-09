@@ -134,4 +134,4 @@ data/
 *.json
 *.pickle
 headers.py
-traefik.toml
+traefik/
