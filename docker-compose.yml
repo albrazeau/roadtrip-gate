@@ -18,8 +18,8 @@ services:
       volumes:
           - ./app:/app
           - ./data:/data
-      ports:
-          - 80:80
+      # ports:
+      #     - 80:80
       networks:
           - roadtrip-net
       environment:
@@ -27,10 +27,42 @@ services:
           - FLASK_DEBUG=1
       env_file: 
           - ./.env
+      labels:
+        - 'traefik.enable=true'
+        - 'traefik.http.routers.my-app.rule=Host(`18.221.120.217`)'
+        - 'traefik.http.routers.my-app.tls=true'
+        - 'traefik.http.routers.my-app.tls.certresolver=lets-encrypt'
+        - 'traefik.docker.network=traefik_default'
+      # entrypoint: /prod_entrypoint.sh
 
-      command: /app/run_all.sh
+      # command: /app/run_all.sh
       # below doesn't appear to work
       # command: python /app/pipeline.py && flask run --host=0.0.0.0 --port=80 
+
+  email-pipeline:
+    build: ./app
+    volumes:
+      - ./app:/app
+      - ./data:/data
+    networks:
+      - roadtrip-net
+    env_file: 
+      - ./.env
+    command: python /app/gotmail.py
+
+  traefik:
+    image: traefik:2.1
+    restart: always
+    ports:
+      - '80:80'
+      - '443:443'
+    volumes:
+      - ./traefik:/etc/traefik
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "traefik.port=8080"
+    networks:
+      - roadtrip-net
 
 volumes:
     roadtrip-db:

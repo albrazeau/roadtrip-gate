@@ -15,9 +15,12 @@ import base64
 import re
 import psycopg2
 import random
+import pandas as pd
+from glob import glob
+import logging
 
-# from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
-from headers import GEOPY_USRNAME, VALID_EMAILS
+from headers import GEOPY_USRNAME, VALID_EMAILS, DB_CONNECTION_DOCKER, DB_CONNECTION_LOCAL
+# from headers import GEOPY_USRNAME, VALID_EMAILS
 from geopy.geocoders import Nominatim
 from datetime import datetime
 from time import sleep
@@ -28,9 +31,17 @@ print = partial(print, flush=True)
 
 # local
 # DB_CONNECTION = DB_CONNECTION_LOCAL
+# RAW_PATH = '/home/ubuntu/workbench/roadtrip-gate/data/raw'
+# READY_PATH = '/home/ubuntu/workbench/roadtrip-gate/data/ready'
 
 # docker
-# DB_CONNECTION = DB_CONNECTION_DOCKER
+DB_CONNECTION = DB_CONNECTION_DOCKER
+RAW_PATH = '/data/raw'
+READY_PATH = '/data/ready'
+
+DEFAULT_GEO = ('39.009734', '-97.555620')
+
+logging.basicConfig(filename='/app/gotmail.log', level=logging.WARNING)
 
 def get_geotagging(exif):
     if not exif:
@@ -84,19 +95,26 @@ def get_coordinates(geotags):
     return (lat, lon)
 
 
-def insert_pg(sql):
+def insertImg(sql):
     with closing(psycopg2.connect(DB_CONNECTION)) as conn:
         with conn:
             with conn.cursor() as curs:
                 curs.execute(sql)
         conn.commit()
 
-def clean_and_resize(img):
+def resize_and_save(old_filepath, new_filepath):
 
-    image = Image.open(img.replace("ready","raw"))
+    image = Image.open(old_filepath)
     width, height = image.size
 
-    w, h = int(width/7), int(height/7)
+    if width >= height:
+        w = 441
+        h = 330
+
+    if height >= width:
+        w = 219
+        h = 292
+
     image = image.resize((w,h), Image.ANTIALIAS)
 
     data = list(image.getdata())
@@ -104,29 +122,14 @@ def clean_and_resize(img):
     no_exif = Image.new(image.mode, image.size)
     no_exif.putdata(data)
 
-    no_exif.save(img)
+    no_exif.save(new_filepath)
+    os.remove(old_filepath)
 
-    return image
 
 def extractEmail(text:str):
     match = re.search(r'[\w.+-]+@[\w-]+\.[\w.-]+', text)
     if match:
         return match.group(0)
-
-# def imageFromBytes(byte_string: str, path, img_name):
-
-#     pathway = os.path.join(path, img_name)
-
-#     attachment = base64.urlsafe_b64decode(
-#                 byte_string
-#                 )
-
-#     if not os.path.exists(pathway):
-#         with open(pathway, "wb") as f:
-#             f.write(attachment)
-#             return None
-    
-#     return "Error translating image from bytes."
 
 def add_geolocation(city_and_state: str) -> tuple:
 
@@ -137,8 +140,35 @@ def add_geolocation(city_and_state: str) -> tuple:
         return (location.latitude, location.longitude)
         
     else:
-        return None
+        return (None, None)
 
+def imgExists(img_id):
+
+    check_img = f"""
+                SELECT * FROM roadtrip.images WHERE attachment_id = '{img_id}';
+                """
+
+    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+        with conn:
+            exists = pd.read_sql(check_img, conn)
+
+            if len(exists) >= 1:
+                return True
+
+    return False
+
+def getImgData(img_path):
+
+    check_img = f"""
+                SELECT * FROM roadtrip.images WHERE filepath = '{img_path}';
+                """
+
+    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+        with conn:
+            df = pd.read_sql(check_img, conn)
+            return df
+
+    return False
 
 def connectGmail(token = 'token.pickle'):
     
@@ -173,7 +203,7 @@ def connectGmail(token = 'token.pickle'):
 def fetchEmailData(gmail_connection):
 
     # request a list of all the messages
-    result = service.users().messages().list(userId='me').execute()
+    result = gmail_connection.users().messages().list(userId='me').execute()
 
     # can also pass maxResults to get any number of emails. Like this:
     # result = service.users().messages().list(maxResults=200, userId='me').execute()
@@ -184,203 +214,158 @@ def fetchEmailData(gmail_connection):
 
     # iterate through all the messages
     for msg in messages:
+        
+        check_content = f"""
+                    SELECT email_id FROM roadtrip.images;
+                    """
 
-        msg_content = service.users().messages().get(userId='me', id=msg['id']).execute()
-        photo_information = {}
-        n = 1
+        with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+            with conn:
+                df = pd.read_sql(check_content, conn)
 
-        if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
-            date = msg_content['snippet'].lower().split('date:')[1].split(';')[0]
-            photo_information['Date'] = date
+            if not msg['id'] in df.email_id.to_list():
+
+                msg_content = gmail_connection.users().messages().get(userId='me', id=msg['id']).execute()
+                photo_information = {}
+                n = 1
+
+                if msg_content['snippet'] and 'date' in msg_content['snippet'].lower():
+                    date = msg_content['snippet'].lower().split('date:')[1].split(';')[0].strip().title()
+                    if not ":" in date:
+                        date += ' 0:00 AM'
+                    photo_information['Date'] = datetime.strptime(date.replace(",", ""), '%B %d %Y %H:%M %p')
 
 
-        # parse message object to pull subject data and validate sender in payload HEADERS
-        for element in msg_content['payload']['headers']:
-            if element['name'] == 'Subject':
-                if ';' in element['value']:
-                    location, caption = element['value'].split(";")
-                else:
-                    location, caption = element['value'], element['value']
-                photo_information['Location'] = location
-                photo_information['Caption'] = caption
 
-            if element['name'] == 'From' and extractEmail(element['value']) in VALID_EMAILS:
-                photo_information['Valid'] = True
+                # parse message object to pull subject data and validate sender in payload HEADERS
+                for element in msg_content['payload']['headers']:
+                    if element['name'] == 'Subject':
+                        if ';' in element['value']:
+                            location, caption = element['value'].split(";")
+                        else:
+                            location, caption = element['value'], element['value']
+                        photo_information['Location'] = location
+                        photo_information['Caption'] = caption
 
-        # parse message oject for attachments in payload PARTS
-        for part in msg_content['payload']['parts']:
-            if 'attachmentId' in part['body'].keys():
+                    if element['name'] == 'From' and extractEmail(element['value']) in VALID_EMAILS:
+                        photo_information['Valid'] = True
 
-                if msg['id'] in image_dictionary.keys():
-                    image_dictionary[msg['id']]['Attachments'].append(part['body']['attachmentId'])
-                else:
-                    photo_information['Attachments'] = []
-                    photo_information['Attachments'].append(part['body']['attachmentId'])
-                    image_dictionary[msg['id']] = photo_information
-            if 'filename' in part['body'].keys():
-                print(part['body']['filename'])
-    
+                # parse message oject for attachments in payload PARTS
+                for part in msg_content['payload']['parts']:
+                    if 'attachmentId' in part['body'].keys():
+
+                        if msg['id'] in image_dictionary.keys():
+                            image_dictionary[msg['id']]['Attachments'].append(part['body']['attachmentId'])
+                        else:
+                            photo_information['Attachments'] = []
+                            photo_information['Attachments'].append(part['body']['attachmentId'])
+                            image_dictionary[msg['id']] = photo_information
+                    if 'filename' in part['body'].keys():
+                        print(part['body']['filename'])
+        
     return image_dictionary
+
+
+
+def insertImg(attachment_ID, email_id, photo_location, caption, filepath, date_taken, lat, lon):
+    
+    sql = f"""
+    INSERT INTO roadtrip.images VALUES (
+        '{attachment_ID}',
+        '{email_id}',
+        '{photo_location}',
+        '{caption}',
+        '{filepath}',
+        TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
+        ST_SetSRID(ST_Point({lon}, {lat}), 4326)
+    )
+    """
+
+    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+        with conn:
+            with conn.cursor() as curs:
+                curs.execute(sql)
+        conn.commit()
 
 def loadRawImages(image_dictionary, service):
 
     for message_key, message_value in image_dictionary.items():
         n = 1
 
-        # LOCAL PATH
-        raw_path = '/home/ubuntu/workbench/roadtrip-gate/data/raw'
-
-        # IN DOCKER
-        # raw_path = '/data/raw'
-
         for img_id in message_value['Attachments']:
 
-            if not img_id in 
+            attachment_ID = img_id[:25]
 
-            print('Processing Image (loading to raw folder.')
+            if not imgExists(attachment_ID):
 
-            attachmentObj = service.users().messages().attachments().get(
-                    userId='me', 
-                    messageId=message_key,
-                    id=img_id
-                    ).execute()
+                print('Processing Image- loading to raw folder.')
 
-            img_name = re.sub("[^a-zA-Z]+", "", img_id) + '.JPG'
+                attachmentObj = service.users().messages().attachments().get(
+                        userId='me', 
+                        messageId=message_key,
+                        id=img_id
+                        ).execute()
 
-            pathway = os.path.join(raw_path, img_name)
+                img_name = re.sub("[^a-zA-Z]+", "", attachment_ID) + '.JPG'
 
-            attachmentImg = base64.urlsafe_b64decode(
-                attachmentObj['data']
-                )
+                filepath = os.path.join(RAW_PATH, img_name)
 
-            if not os.path.exists(pathway):
-                with open(pathway, "wb") as f:
-                    f.write(attachmentImg)
+                attachmentImg = base64.urlsafe_b64decode(
+                    attachmentObj['data']
+                    )
+                if not os.path.exists(filepath):
+                    with open(filepath, "wb") as f:
+                        f.write(attachmentImg)
 
+                # establish variables to be fed into sql insertion func
+                email_id = message_key
+                photo_location = message_value.get('Location', None)
+                caption = message_value.get('Caption', None)
+                filepath = filepath
 
-def dataPipeline(image_dictionary):
+                if "'" in caption and caption.count("'")%2:
+                    idx = caption.index("'")
+                    caption = caption[:idx] + "'" + caption[idx:]
 
-    for k, v in image_dictionary.items():
-        n = 1
-
-        # LOCAL PATH
-        raw_path = '/home/ubuntu/workbench/roadtrip-gate/data/raw'
-        ready_path = '/home/ubuntu/workbench/roadtrip-gate/data/ready'
-
-        # IN DOCKER
-        # raw_path = '/data/raw'
-        # ready_path = '/data/ready'
-
-        for ea_img in v['Attachments']:
-
-            print('Processing image')
-
-            attachmentObj = service.users().messages().attachments().get(
-                    userId='me', 
-                    messageId=k,
-                    id=ea_img
-                    ).execute()
-            
-            img_name = re.sub("[^a-zA-Z]+", "", f"{v['Caption']}") + f'_{n}.JPG'
-            n+= 1
-
-            # load image into RAW DATA FOLDER 
-            # returns NONE if there is no pipeline error
-            pipeline_error = imageFromBytes(attachmentObj['data'], raw_path, img_name)
-
-            if pipeline_error:
-                # CALL FUNCTION TO SEND EMAIL THAT THERE WAS AN ISSUE
-                # break
-                pass
-            if not pipeline_error:
-
-                pathway = os.path.join(raw_path, img_name)
+                if "'" in photo_location and photo_location.count("'")%2:
+                    idx = photo_location.index("'")
+                    photo_location = photo_location[:idx] + "'" + photo_location[idx:]
 
                 try:
-                    exif = get_exif(pathway)
+                    exif = get_exif(filepath)
                     metadata = get_labeled_exif(exif)
                     geotags = get_geotagging(exif)
                     lat, lon = get_coordinates(geotags)
-
-                except:
-                    exif = get_exif(pathway)
-                    metadata = get_labeled_exif(exif)
-                    location = add_geolocation(v['Location'])
-                    if not location:
-                        # CALL FUNCTION TO SEND EMAIL THERE WAS AN ISSUE
-                        pass
-                    
-                    lat, lon = location
-
-                try:
                     date_taken = metadata["DateTimeOriginal"]
+                
                 except:
-                    date_taken = datetime.now().strftime("%Y:%m:%d")
-                guid_num = (
-                    float(metadata.get("ApertureValue", random.randint(1, 200))) *
-                    float(metadata.get('BrightnessValue', random.randint(1, 200)))*
-                    float(metadata.get('ExposureTime', random.randint(1, 200)))
-                    * lat
-                    * lon
-                )
-                guid = f"{guid_num}_{date_taken}"
+                    lat, lon = add_geolocation(photo_location)
+                    date_taken = message_value.get('Date', datetime.now())
 
-                final_path = os.path.join(ready_path, img_name)
+                if not lat and not lon:
+                    lon, lat = DEFAULT_GEO
+                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "nogeodata"), date_taken, lat, lon)
+                    resize_and_save(filepath, filepath.replace("raw", "nogeodata"))
 
-                print(f'Final image ready for saving. Final path: ', final_path)
-                    
-                final_img = clean_and_resize(final_path)
-
-                if "'" in v['Caption'] and v['Caption'].count("'")%2:
-                    idx = v['Caption'].index("'")
-                    v['Caption'] = v['Caption'][:idx] + "'" + v['Caption'][idx:]
-                    print(v['Caption'])
-
-                insert_sql = f"""
-                        INSERT INTO roadtrip.images VALUES (
-                            '{guid}',
-                            '{k}',
-                            '{final_path.split('/')[-1]}',
-                            TO_TIMESTAMP('{date_taken}', 'YYYY:MM:DD HH24:MI:SS')::timestamp,
-                            ST_SetSRID(ST_Point({lon}, {lat}), 4326),
-                            '{v['Caption']}'
-                        )
-                        ON CONFLICT (guid) DO UPDATE SET
-                            email_id = EXCLUDED.email_id,
-                            file_name = EXCLUDED.file_name,
-                            date_taken = EXCLUDED.date_taken,
-                            geom = EXCLUDED.geom,
-                            caption = EXCLUDED.caption
-                        ;
-                        """
-
-                insert_pg(insert_sql)
-
-                print("Completed. ", final_path)
-
-
-def checkExists(img_id):
-
-    check_img = f"""
-                SELECT * FROM roadtrip.images WHERE attachment_id = {img_id};
-                """
-
-    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
-        with conn:
-            exists = pd.read_sql(check_img, conn)
-
-    if exists:
-        return True
-    return False
+                if lat and lon:
+                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
+                    resize_and_save(filepath, filepath.replace("raw", "ready"))
 
 if __name__ == "__main__":
+
+    try:
+        sleep(15)
+        print("Starting")
+        while True:
+
+            server = connectGmail()
+            img_dict = fetchEmailData(server)
+            loadRawImages(img_dict, server)
+
+            print("Sleeping")
+            sleep(20)
     
-    print("Starting")
-    while True:
-
-        service = connectGmail()
-        img_dict = fetchEmailData(service)
-        dataPipeline(img_dict)
-
-        print("Sleeping")
-        sleep(60)
+    except Exception as e:
+        logging.error("This is the error: %s", e, exc_info=1)
+        raise e
+        pass

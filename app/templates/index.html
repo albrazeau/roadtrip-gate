@@ -2,12 +2,17 @@
 <html lang="en">
 
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='main.css') }}" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css"
         integrity="sha512-iBBXm8fW90+nuLcSKlbmrPcLa0OT92xO1BIsZ+ywDWZCvqsWgccV3gFoRBv0z+8dLJgyAHIhR35VZc2oM/gI1w=="
         crossorigin="anonymous" referrerpolicy="no-referrer" />
     <link rel="stylesheet" href="https://unpkg.com/blocks.css/dist/blocks.min.css" />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Rancho&effect=shadow-multiple" />
+    <link rel="stylesheet" type="text/css" href="//fonts.googleapis.com/css?family=Montserrat" />
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='favicon.png') }}">
     <title>Beep This Jeep</title>
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
 </head>
@@ -24,21 +29,33 @@
             </h1>
         </div>
 
-        <div>
+        <div style="text-align: left;">
+            <h2>
+                We're Ally and Alec 👋
+            </h2>
             <h4>
-                This is a visual log of our cross-country roadtrip as we explore the national park system and figure out
-                what city we want to live in next.
-                <br />
-                In May of this year, we packed up our home in DC and said goodbye to friends, ready for a new adventure
-                and a new city.
-                What made this move different, however, is that we didn't have a set destination in mind.
-                <br /><br />
-                I've seen the future and it's getting better all the time!
+                This is a photo map of our journey across the US. We wanted a change of pace but didn't know exactly
+                where we wanted to live. Instead, we set out on a roadtrip to see new places, explore the National Park
+                system, and find a new city to call home. Enjoy!
             </h4>
         </div>
 
-        <div class="editor fixed block" style="width:100%">{{ create_map() }}</div>
+        <div class="editor fixed block">
+            <iframe class="map" src="/map"></iframe>
+        </div>
+
         <br><br><br><br>
+
+    </div>
+
+    <div class="footer">
+        <div class="madebyAE">
+
+        </div>
+        <div class="rightsreserved">
+            <a id="attributionlink" href="//allysonenglish.io" target="_blank">Made By AE.</a>
+        </div>
+
     </div>
 
 </body>
