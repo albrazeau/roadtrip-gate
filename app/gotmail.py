@@ -343,18 +343,18 @@ def loadRawImages(image_dictionary, service):
 
                 if not lat and not lon:
                     lon, lat = DEFAULT_GEO
-                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "nogeodata"), date_taken, lat, lon)
                     resize_and_save(filepath, filepath.replace("raw", "nogeodata"))
+                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "nogeodata"), date_taken, lat, lon)
 
                 if lat and lon:
-                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
                     resize_and_save(filepath, filepath.replace("raw", "ready"))
+                    insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
 
 if __name__ == "__main__":
 
     sleep(15)
     print("Starting")
-    
+
     while True:
 
         try:
