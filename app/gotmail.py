@@ -352,19 +352,20 @@ def loadRawImages(image_dictionary, service):
 
 if __name__ == "__main__":
 
-    try:
-        sleep(15)
-        print("Starting")
-        while True:
+    sleep(15)
+    print("Starting")
+    
+    while True:
+
+        try:
 
             server = connectGmail()
             img_dict = fetchEmailData(server)
             loadRawImages(img_dict, server)
 
             print("Sleeping")
-            sleep(20)
-    
-    except Exception as e:
-        logging.error("This is the error: %s", e, exc_info=1)
-        raise e
-        pass
+            sleep(60)
+
+        except Exception as e:
+            logging.error("This is the error: %s", e, exc_info=1)
+            print(e)
