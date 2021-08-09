@@ -9,7 +9,6 @@ from PIL.ExifTags import TAGS
 from PIL.ExifTags import GPSTAGS
 
 from contextlib import closing
-import pickle
 import os.path
 import base64
 import re
@@ -170,7 +169,7 @@ def getImgData(img_path):
 
     return False
 
-def connectGmail(token = 'token.pickle'):
+def connectGmail(token = 'token.json'):
     
     print('Establishing connection to GMAIL.')
 
