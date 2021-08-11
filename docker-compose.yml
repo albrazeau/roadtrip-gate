@@ -18,8 +18,6 @@ services:
       volumes:
           - ./app:/app
           - ./data:/data
-      # ports:
-      #     - 80:80
       networks:
           - roadtrip-net
       environment:
@@ -48,7 +46,7 @@ services:
       - roadtrip-net
     env_file: 
       - ./.env
-    command: python /app/gotmail.py
+    entrypoint: python /app/gotmail.py
 
   traefik:
     image: traefik:2.1

@@ -350,8 +350,8 @@ def loadRawImages(image_dictionary, service):
 
 if __name__ == "__main__":
 
-    sleep(15)
     print("Starting")
+    sleep(60*60*24)
 
     while True:
 
@@ -361,9 +361,9 @@ if __name__ == "__main__":
             img_dict = fetchEmailData(server)
             loadRawImages(img_dict, server)
 
-            print("Sleeping")
-            sleep(60)
-
         except Exception as e:
             logging.error("This is the error: %s", e, exc_info=1)
             print(e)
+
+        print("Sleeping")
+        sleep(60*60*4)
