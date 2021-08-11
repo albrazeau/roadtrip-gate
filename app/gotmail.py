@@ -104,9 +104,18 @@ def insertImg(sql):
                 curs.execute(sql)
         conn.commit()
 
-def resize_and_save(old_filepath, new_filepath):
+def resize_and_save(old_filepath, new_filepath, m_data):
 
     image = Image.open(old_filepath)
+    print(m_data)
+
+    if m_data.get('Orientation') == 3:
+        image=image.rotate(180, expand=True)
+    elif m_data.get('Orientation') == 6:
+        image=image.rotate(270, expand=True)
+    elif m_data.get('Orientation') == 8:
+        image=image.rotate(90, expand=True)
+
     width, height = image.size
 
     if width >= height:
@@ -332,9 +341,10 @@ def loadRawImages(image_dictionary, service):
                     idx = photo_location.index("'")
                     photo_location = photo_location[:idx] + "'" + photo_location[idx:]
 
+                exif = get_exif(filepath)
+                metadata = get_labeled_exif(exif)
+
                 try:
-                    exif = get_exif(filepath)
-                    metadata = get_labeled_exif(exif)
                     geotags = get_geotagging(exif)
                     lat, lon = get_coordinates(geotags)
                     date_taken = metadata["DateTimeOriginal"]
@@ -345,11 +355,11 @@ def loadRawImages(image_dictionary, service):
 
                 if not lat and not lon:
                     lon, lat = DEFAULT_GEO
-                    resize_and_save(filepath, filepath.replace("raw", "nogeodata"))
+                    resize_and_save(filepath, filepath.replace("raw", "nogeodata"), metadata)
                     insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "nogeodata"), date_taken, lat, lon)
 
                 if lat and lon:
-                    resize_and_save(filepath, filepath.replace("raw", "ready"))
+                    resize_and_save(filepath, filepath.replace("raw", "ready"), metadata)
                     insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
 
 def generateMap():
