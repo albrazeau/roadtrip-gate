@@ -3,6 +3,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 
+import folium
+from folium import IFrame
+import folium.plugins as plugins
+
 from PIL import ImageFile, Image
 ImageFile.LOAD_TRUNCATED_IMAGES = True
 from PIL.ExifTags import TAGS
@@ -348,10 +352,82 @@ def loadRawImages(image_dictionary, service):
                     resize_and_save(filepath, filepath.replace("raw", "ready"))
                     insertImg(attachment_ID, email_id, photo_location, caption, filepath.replace("raw", "ready"), date_taken, lat, lon)
 
+def generateMap():
+
+    US_CENTER = ('39.009734', '-97.555620')
+
+    fetch_sql = f"""SELECT
+                        attachment_id,
+                        filepath,
+                        caption,
+                        date_taken,
+                        ST_X(geom) AS lon_x,
+                        ST_Y(geom) AS lat_y
+                    FROM
+                        roadtrip.images;"""
+
+    with closing(psycopg2.connect(DB_CONNECTION)) as conn:
+        df = pd.read_sql(fetch_sql, conn)
+
+    folium_map = folium.Map(location=US_CENTER, 
+    zoom_start=4, scrollWheelZoom=False, tiles=None)
+
+    folium_map.add_child(plugins.Geocoder())
+    folium.TileLayer('openstreetmap', name = 'Street').add_to(folium_map)
+    folium.TileLayer('Stamen Terrain', name = 'Terrain').add_to(folium_map)
+    folium.TileLayer(
+        tiles = 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+        attr = 'Esri',
+        name = 'Satellite'
+    ).add_to(folium_map)
+    folium.LayerControl().add_to(folium_map)
+    folium_map.add_child(plugins.Fullscreen(position='topleft', title='Full Screen', title_cancel='Exit Full Screen', force_separate_button=False))
+
+    for idx in range(len(df)):
+
+        img_name = df.iloc[idx]['caption']
+        filepath = df.iloc[idx]['filepath']
+        lon = df.iloc[idx]['lon_x']
+        lat = df.iloc[idx]['lat_y']
+
+        # resize appropriately
+        image = Image.open(filepath)
+        width, height = image.size
+        width = width + 25
+        height = height + 25
+
+        # nesting the image loading and route mapping to a try except-- top candidate for future refactor
+
+        try:
+
+            encoded = base64.b64encode(open(filepath, 'rb').read())
+            html = '<img src="data:image/JPG;base64,{}">'.format(encoded.decode("UTF-8"))
+            
+            iframe = IFrame(html, width=width, height=height)
+
+            popup = folium.Popup(iframe, max_width=width+25)
+            tooltip = img_name.replace("_"," ")
+        
+            folium.Marker(location=(lat, lon), tooltip=tooltip, popup=popup, icon=folium.Icon(color='blue')).add_to(folium_map)
+
+        except:
+            pass
+
+    # try:
+    #     draw_line = list(df.sort_values(by='date_taken')[['lat_y', 'lon_x']].apply(tuple, axis=1))
+    #     folium.PolyLine(draw_line, color="#c20dff", weight=2.5, opacity=1).add_to(folium_map)
+    # except:
+    #     pass
+
+    folium_map.save('templates/map.html')
+
 if __name__ == "__main__":
 
-    print("Starting")
-    sleep(60*60*24)
+    print("Starting: Generating default map")
+    generateMap()
+    sleep(60)
+
+    print("Begin data pull from Gmail")
 
     while True:
 
@@ -360,6 +436,8 @@ if __name__ == "__main__":
             server = connectGmail()
             img_dict = fetchEmailData(server)
             loadRawImages(img_dict, server)
+            generateMap()
+            print("Data pull successful")
 
         except Exception as e:
             logging.error("This is the error: %s", e, exc_info=1)
