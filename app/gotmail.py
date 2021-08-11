@@ -424,15 +424,13 @@ def generateMap():
 if __name__ == "__main__":
 
     print("Starting: Generating default map")
-    generateMap()
     sleep(60)
-
-    print("Begin data pull from Gmail")
+    generateMap()
 
     while True:
 
         try:
-
+            print("Begin data pull from Gmail")
             server = connectGmail()
             img_dict = fetchEmailData(server)
             loadRawImages(img_dict, server)
