@@ -107,7 +107,6 @@ def insertImg(sql):
 def resize_and_save(old_filepath, new_filepath, m_data):
 
     image = Image.open(old_filepath)
-    print(m_data)
 
     if m_data.get('Orientation') == 3:
         image=image.rotate(180, expand=True)
@@ -119,8 +118,8 @@ def resize_and_save(old_filepath, new_filepath, m_data):
     width, height = image.size
 
     if width >= height:
-        w = 441
-        h = 330
+        w = 292
+        h = 219
 
     if height >= width:
         w = 219
