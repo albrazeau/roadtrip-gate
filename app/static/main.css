@@ -57,6 +57,24 @@ html, body {
     margin-left: 20%;
   }
 
+  a.ex4:link, a.ex4:hover, a.ex4:active, a.ex4:visited  
+  {
+    background: #c7efff;
+    border-radius: 4px;
+    color: black;
+    text-decoration: none;
+    padding: .25px;
+  }
+
+  a.ex4:hover, a.ex4:active
+  {
+    background: #a8ecff;
+    border-radius: 4px;
+    color: black;
+    text-decoration: underline;
+    padding: .25px;
+  }
+
 /* Footer */
 .footer {
   width: 100%;
